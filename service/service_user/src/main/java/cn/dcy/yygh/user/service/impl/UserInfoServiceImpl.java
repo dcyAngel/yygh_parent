@@ -65,5 +65,6 @@ public class UserInfoServiceImpl extends
         map.put("name",name);
         map.put("token","");
         return map;
+        //fgd
     }
 }
