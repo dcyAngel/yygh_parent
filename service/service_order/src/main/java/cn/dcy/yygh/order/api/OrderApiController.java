@@ -6,6 +6,7 @@ import cn.dcy.yygh.enums.OrderStatusEnum;
 import cn.dcy.yygh.model.order.OrderInfo;
 import cn.dcy.yygh.model.user.UserInfo;
 import cn.dcy.yygh.order.service.OrderService;
+import cn.dcy.yygh.vo.order.OrderCountQueryVo;
 import cn.dcy.yygh.vo.order.OrderQueryVo;
 import cn.dcy.yygh.vo.user.UserInfoQueryVo;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -14,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/order/orderInfo")
@@ -53,5 +55,17 @@ public class OrderApiController {
     @GetMapping("auth/getStatusList")
     public Result getStatusList(){
         return Result.ok(OrderStatusEnum.getStatusList());
+    }
+
+    //取消预约
+    @GetMapping("auth/cancelOrder/{orderId}")
+    public  Result cancelOrder(@PathVariable Long orderId){
+       boolean isOrder =  orderService.cancelOrder(orderId);
+       return Result.ok(isOrder);
+    }
+    //获取订单统计数据
+    @PostMapping("inner/getCountMap")
+    public Map<String,Object> getCountMap(@RequestBody OrderCountQueryVo orderCountQueryVo){
+        return orderService.getCountMap(orderCountQueryVo);
     }
 }

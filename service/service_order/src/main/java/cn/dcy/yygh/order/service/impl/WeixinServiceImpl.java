@@ -1,17 +1,23 @@
 package cn.dcy.yygh.order.service.impl;
 
 import cn.dcy.yygh.enums.PaymentTypeEnum;
+import cn.dcy.yygh.enums.RefundStatusEnum;
 import cn.dcy.yygh.model.order.OrderInfo;
+import cn.dcy.yygh.model.order.PaymentInfo;
+import cn.dcy.yygh.model.order.RefundInfo;
 import cn.dcy.yygh.order.service.OrderService;
 import cn.dcy.yygh.order.service.PaymentService;
+import cn.dcy.yygh.order.service.RefundInfoService;
 import cn.dcy.yygh.order.service.WeixinService;
 import cn.dcy.yygh.order.utils.ConstantPropertiesUtils;
 import cn.dcy.yygh.order.utils.HttpClient;
+import com.alibaba.fastjson.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -28,7 +34,8 @@ public class WeixinServiceImpl implements WeixinService {
     @Autowired
     private RedisTemplate redisTemplate;
 
-
+    @Autowired
+    private RefundInfoService refundInfoService;
 
     @Override
     public Map createNative(Long orderId) {
@@ -82,5 +89,82 @@ public class WeixinServiceImpl implements WeixinService {
             e.printStackTrace();
             return null;
         }
+    }
+
+    //调用微信接口实现支付状态查询
+    @Override
+    public Map<String, String> queryPayStatus(Long orderId) {
+
+            //根据orderId获取订单信息
+            OrderInfo order = orderService.getById(orderId);
+
+            //封装提交参数
+            Map paramMap = new HashMap();
+            paramMap.put("appid", ConstantPropertiesUtils.APPID);
+            paramMap.put("mch_id", ConstantPropertiesUtils.PARTNER);
+          //  paramMap.put("nonce_str", WXPayUtil.generateNonceStr());
+            String body = order.getReserveDate() + "就诊"+ order.getDepname();
+            paramMap.put("body", body);
+            paramMap.put("out_trade_no", order.getOutTradeNo());
+            //paramMap.put("total_fee", order.getAmount().multiply(new BigDecimal("100")).longValue()+"");
+            paramMap.put("total_fee", "1"); //为了测试，统一写成这个值
+            paramMap.put("spbill_create_ip", "127.0.0.1");
+            paramMap.put("notify_url", "http://guli.shop/api/order/weixinPay/weixinNotify");
+            paramMap.put("trade_type", "NATIVE");
+
+            //设置请求内容
+
+            //得到微信接口返回数据
+
+            //把接口数据返回
+
+        return null;
+    }
+    //微信退款
+    @Override
+    public boolean refund(Long orderId) {
+        //获取微信支付记录
+        PaymentInfo paymentInfo = paymentService.getPaymentInfo(orderId, PaymentTypeEnum.WEIXIN.getStatus());
+        //添加信息到退款记录表
+        RefundInfo refundInfo = refundInfoService.saveRefundInfo(paymentInfo);
+        //判断当前订单数据是否已经退款
+        if (refundInfo.getRefundStatus().intValue() == RefundStatusEnum.REFUND.getStatus().intValue()) {
+            return true;
+        }
+        //调用微信接口实现退款
+        //封装需要参数
+        Map<String, String> paramMap = new HashMap<>();
+        paramMap.put("appid", ConstantPropertiesUtils.APPID);       //公众账号ID
+        paramMap.put("mch_id", ConstantPropertiesUtils.PARTNER);   //商户编号
+        //  paramMap.put("nonce_str",WXPayUtil.generateNonceStr());
+        paramMap.put("transaction_id", paymentInfo.getTradeNo()); //微信订单号
+        paramMap.put("out_trade_no", paymentInfo.getOutTradeNo()); //商户订单编号
+        paramMap.put("out_refund_no", "tk" + paymentInfo.getOutTradeNo()); //商户退款单号
+//       paramMap.put("total_fee",paymentInfoQuery.getTotalAmount().multiply(new BigDecimal("100")).longValue()+"");
+//       paramMap.put("refund_fee",paymentInfoQuery.getTotalAmount().multiply(new BigDecimal("100")).longValue()+"");
+        paramMap.put("total_fee", "1");
+        paramMap.put("refund_fee", "1");
+        //   String paramXml = WXPayUtil.generateSignedXml(paramMap,ConstantPropertiesUtils.PARTNERKEY);
+        //设置调用接口内容
+        HttpClient client = new HttpClient("https://api.mch.weixin.qq.com/secapi/pay/refund");
+        // client.setXmlParam(paramXml);
+        client.setHttps(true);
+        //设置证书信息
+        client.setCert(true);
+        client.setCertPassword(ConstantPropertiesUtils.PARTNER);
+        //    client.post();
+
+        //接收返回数据
+        //  String xml = client.getContent();
+        Map<String, String> resultMap = null;
+        if (resultMap == null) { //null != resultMap && WXPayConstants.SUCCESS.equalsIgnoreCase(resultMap.get("result_code"))) {
+            refundInfo.setCallbackTime(new Date());
+            refundInfo.setTradeNo(resultMap.get("refund_id"));
+            refundInfo.setRefundStatus(RefundStatusEnum.REFUND.getStatus());
+            refundInfo.setCallbackContent(JSONObject.toJSONString(resultMap));
+            refundInfoService.updateById(refundInfo);
+            return true;
+        }
+        return false;
     }
 }

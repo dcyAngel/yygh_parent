@@ -1,6 +1,7 @@
 package cn.dcy.yygh.model.order;
 
-import jw.hospital.model.base.BaseEntity;
+
+import cn.dcy.yygh.model.base.BaseEntity;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import io.swagger.annotations.ApiModel;
